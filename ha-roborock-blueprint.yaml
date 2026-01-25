@@ -1,0 +1,326 @@
+blueprint:
+  name: Roborock cleaner
+  domain: automation
+  input:
+    roborock_cleaning_binary_sensor:
+      name: Roborock cleaning entity
+      description: The roborock cleaning entity to act upon
+      selector:
+        entity:
+          domain: binary_sensor
+    switch_delay_seconds:
+      name: Switch-delay (seconds)
+      description: How long the trigger booleans must remain ON before triggering. 0 = immediately.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    ready_delay_seconds:
+      name: Ready-delay (seconds)
+      description: How long the robot must be 'ready' before continuing to execute its next task.
+      default: 60
+      selector:
+        number:
+          min: 5
+          max: 120
+          step: 1
+          unit_of_measurement: s
+          mode: box
+
+    clean_switch_1_input:
+      name: Clean switch 1
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_1_input:
+      name: Roborock clean action 1
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_2_input:
+      name: Clean switch 2 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_2_input:
+      name: Roborock clean action 2 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_3_input:
+      name: Clean switch 3 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_3_input:
+      name: Roborock clean action 3 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_4_input:
+      name: Clean switch 4 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_4_input:
+      name: Roborock clean action 4 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_5_input:
+      name: Clean switch 5 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_5_input:
+      name: Roborock clean action 5 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_6_input:
+      name: Clean switch 6 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_6_input:
+      name: Roborock clean action 6 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_7_input:
+      name: Clean switch 7 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_7_input:
+      name: Roborock clean action 7 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_8_input:
+      name: Clean switch 8 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_8_input:
+      name: Roborock clean action 8 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_9_input:
+      name: Clean switch 9 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_9_input:
+      name: Roborock clean action 9 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+    clean_switch_10_input:
+      name: Clean switch 10 (optional)
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    clean_btn_10_input:
+      name: Roborock clean action 10 (optional)
+      default:
+      selector:
+        entity:
+          domain: button
+
+mode: single
+
+variables:
+  clean_switch_1: !input clean_switch_1_input
+  clean_btn_1: !input clean_btn_1_input
+  clean_switch_2: !input clean_switch_2_input
+  clean_btn_2: !input clean_btn_2_input
+  clean_switch_3: !input clean_switch_3_input
+  clean_btn_3: !input clean_btn_3_input
+  clean_switch_4: !input clean_switch_4_input
+  clean_btn_4: !input clean_btn_4_input
+  clean_switch_5: !input clean_switch_5_input
+  clean_btn_5: !input clean_btn_5_input
+  clean_switch_6: !input clean_switch_6_input
+  clean_btn_6: !input clean_btn_6_input
+  clean_switch_7: !input clean_switch_7_input
+  clean_btn_7: !input clean_btn_7_input
+  clean_switch_8: !input clean_switch_8_input
+  clean_btn_8: !input clean_btn_8_input
+  clean_switch_9: !input clean_switch_9_input
+  clean_btn_9: !input clean_btn_9_input
+  clean_switch_10: !input clean_switch_10_input
+  clean_btn_10: !input clean_btn_10_input
+
+trigger:
+  - platform: state
+    entity_id:
+      - !input clean_switch_1_input
+      - !input clean_switch_2_input
+      - !input clean_switch_3_input
+      - !input clean_switch_4_input
+      - !input clean_switch_5_input
+      - !input clean_switch_6_input
+      - !input clean_switch_7_input
+      - !input clean_switch_8_input
+      - !input clean_switch_9_input
+      - !input clean_switch_10_input
+    to: "on"
+    for:
+      seconds: !input switch_delay_seconds
+
+  - platform: state
+    entity_id: !input roborock_cleaning_binary_sensor
+    to:
+      - "off"
+    for:
+      seconds: !input ready_delay_seconds
+
+condition:
+  - condition: state
+    entity_id: !input roborock_cleaning_binary_sensor
+    state:
+      - "off"
+
+action:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ is_state(clean_switch_1, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_1 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_1 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_2 and clean_btn_2 and is_state(clean_switch_2, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_2 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_2 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_3 and clean_btn_3 and is_state(clean_switch_3, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_3 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_3 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_4 and clean_btn_4 and is_state(clean_switch_4, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_4 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_4 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_5 and clean_btn_5 and is_state(clean_switch_5, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_5 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_5 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_6 and clean_btn_6 and is_state(clean_switch_6, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_6 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_6 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_7 and clean_btn_7 and is_state(clean_switch_7, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_7 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_7 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_8 and clean_btn_8 and is_state(clean_switch_8, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_8 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_8 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_9 and clean_btn_9 and is_state(clean_switch_9, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_9 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_9 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ clean_switch_10 and clean_btn_10 and is_state(clean_switch_10, 'on') }}"
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ clean_btn_10 }}"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ clean_switch_10 }}"
