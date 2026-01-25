@@ -11,7 +11,7 @@ blueprint:
     switch_delay_seconds:
       name: Switch-delay (seconds)
       description: How long the trigger booleans must remain ON before triggering. 0 = immediately.
-      default: 0
+      default: 3
       selector:
         number:
           min: 0
@@ -159,7 +159,8 @@ blueprint:
         entity:
           domain: button
 
-mode: single
+mode: queued
+max: 20
 
 trigger_variables:
   clean_switch_trigger_1: !input clean_switch_1_input
@@ -231,6 +232,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_1 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_1 }}"
@@ -242,6 +250,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_2 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_2 }}"
@@ -253,6 +268,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_3 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_3 }}"
@@ -264,6 +286,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_4 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_4 }}"
@@ -275,6 +304,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_5 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_5 }}"
@@ -286,6 +322,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_6 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_6 }}"
@@ -297,6 +340,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_7 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_7 }}"
@@ -308,6 +358,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_8 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_8 }}"
@@ -319,6 +376,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_9 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_9 }}"
@@ -330,6 +394,13 @@ action:
           - service: button.press
             target:
               entity_id: "{{ clean_btn_10 }}"
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input roborock_cleaning_binary_sensor
+                to: "on"
+                for: "00:00:05"
+            timeout: "00:02:05"
+            continue_on_timeout: false
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ clean_switch_10 }}"
