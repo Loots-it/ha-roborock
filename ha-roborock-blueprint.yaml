@@ -2,6 +2,11 @@ blueprint:
   name: Roborock cleaner
   domain: automation
   input:
+    roborock_status_entity:
+      name: Roborock status entity
+      description: The roborock status entity to act upon
+      selector:
+        entity: {}
     roborock_cleaning_binary_sensor:
       name: Roborock cleaning entity
       description: The roborock cleaning entity to act upon
@@ -22,11 +27,11 @@ blueprint:
     ready_delay_seconds:
       name: Ready-delay (seconds)
       description: How long the robot must be 'ready' before continuing to execute its next task.
-      default: 180
+      default: 1
       selector:
         number:
-          min: 180
-          max: 600
+          min: 1
+          max: 120
           step: 1
           unit_of_measurement: s
           mode: box
@@ -217,6 +222,14 @@ trigger:
     for:
       seconds: !input ready_delay_seconds
 
+  - platform: state
+    entity_id: !input roborock_status_entity
+    to:
+      - idle
+      - charging
+    for:
+      seconds: !input ready_delay_seconds
+
   - platform: time_pattern
     minutes: "/30"
 
@@ -224,16 +237,18 @@ condition:
   - condition: state
     entity_id: !input roborock_cleaning_binary_sensor
     state: "off"
+    for:
+      seconds: !input ready_delay_seconds
+  - condition: state
+    entity_id: !input roborock_status_entity
+    state:
+      - idle
+      - charging
+    for:
+      seconds: !input ready_delay_seconds
 
 action:
   - choose:
-      - conditions:
-          - condition: state
-            entity_id: !input roborock_cleaning_binary_sensor
-            state: "on"
-        sequence:
-          - stop: "Robot is busy"
-
       - conditions:
           - condition: template
             value_template: "{{ is_state(clean_switch_1, 'on') }}"
