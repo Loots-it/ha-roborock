@@ -161,6 +161,18 @@ blueprint:
 
 mode: single
 
+trigger_variables:
+  clean_switch_trigger_1: !input clean_switch_1_input
+  clean_switch_trigger_2: !input clean_switch_2_input
+  clean_switch_trigger_3: !input clean_switch_3_input
+  clean_switch_trigger_4: !input clean_switch_4_input
+  clean_switch_trigger_5: !input clean_switch_5_input
+  clean_switch_trigger_6: !input clean_switch_6_input
+  clean_switch_trigger_7: !input clean_switch_7_input
+  clean_switch_trigger_8: !input clean_switch_8_input
+  clean_switch_trigger_9: !input clean_switch_9_input
+  clean_switch_trigger_10: !input clean_switch_10_input
+
 variables:
   clean_switch_1: !input clean_switch_1_input
   clean_btn_1: !input clean_btn_1_input
@@ -186,16 +198,16 @@ variables:
 trigger:
   - platform: template
     value_template: >
-      {{ is_state(clean_switch_1, 'on')
-         or (clean_switch_2 and is_state(clean_switch_2, 'on'))
-         or (clean_switch_3 and is_state(clean_switch_3, 'on'))
-         or (clean_switch_4 and is_state(clean_switch_4, 'on'))
-         or (clean_switch_5 and is_state(clean_switch_5, 'on'))
-         or (clean_switch_6 and is_state(clean_switch_6, 'on'))
-         or (clean_switch_7 and is_state(clean_switch_7, 'on'))
-         or (clean_switch_8 and is_state(clean_switch_8, 'on'))
-         or (clean_switch_9 and is_state(clean_switch_9, 'on'))
-         or (clean_switch_10 and is_state(clean_switch_10, 'on')) }}
+      {{ is_state(clean_switch_trigger_1, 'on')
+         or (clean_switch_trigger_2 and is_state(clean_switch_trigger_2, 'on'))
+         or (clean_switch_trigger_3 and is_state(clean_switch_trigger_3, 'on'))
+         or (clean_switch_trigger_4 and is_state(clean_switch_trigger_4, 'on'))
+         or (clean_switch_trigger_5 and is_state(clean_switch_trigger_5, 'on'))
+         or (clean_switch_trigger_6 and is_state(clean_switch_trigger_6, 'on'))
+         or (clean_switch_trigger_7 and is_state(clean_switch_trigger_7, 'on'))
+         or (clean_switch_trigger_8 and is_state(clean_switch_trigger_8, 'on'))
+         or (clean_switch_trigger_9 and is_state(clean_switch_trigger_9, 'on'))
+         or (clean_switch_trigger_10 and is_state(clean_switch_trigger_10, 'on')) }}
     for:
       seconds: !input switch_delay_seconds
 
