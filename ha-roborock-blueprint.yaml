@@ -184,34 +184,31 @@ variables:
   clean_btn_10: !input clean_btn_10_input
 
 trigger:
-  - platform: state
-    entity_id:
-      - !input clean_switch_1_input
-      - !input clean_switch_2_input
-      - !input clean_switch_3_input
-      - !input clean_switch_4_input
-      - !input clean_switch_5_input
-      - !input clean_switch_6_input
-      - !input clean_switch_7_input
-      - !input clean_switch_8_input
-      - !input clean_switch_9_input
-      - !input clean_switch_10_input
-    to: "on"
+  - platform: template
+    value_template: >
+      {{ is_state(clean_switch_1, 'on')
+         or (clean_switch_2 and is_state(clean_switch_2, 'on'))
+         or (clean_switch_3 and is_state(clean_switch_3, 'on'))
+         or (clean_switch_4 and is_state(clean_switch_4, 'on'))
+         or (clean_switch_5 and is_state(clean_switch_5, 'on'))
+         or (clean_switch_6 and is_state(clean_switch_6, 'on'))
+         or (clean_switch_7 and is_state(clean_switch_7, 'on'))
+         or (clean_switch_8 and is_state(clean_switch_8, 'on'))
+         or (clean_switch_9 and is_state(clean_switch_9, 'on'))
+         or (clean_switch_10 and is_state(clean_switch_10, 'on')) }}
     for:
       seconds: !input switch_delay_seconds
 
   - platform: state
     entity_id: !input roborock_cleaning_binary_sensor
-    to:
-      - "off"
+    to: "off"
     for:
       seconds: !input ready_delay_seconds
 
 condition:
   - condition: state
     entity_id: !input roborock_cleaning_binary_sensor
-    state:
-      - "off"
+    state: "off"
 
 action:
   - choose:
