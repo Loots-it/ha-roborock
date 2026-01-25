@@ -22,11 +22,11 @@ blueprint:
     ready_delay_seconds:
       name: Ready-delay (seconds)
       description: How long the robot must be 'ready' before continuing to execute its next task.
-      default: 60
+      default: 180
       selector:
         number:
-          min: 5
-          max: 120
+          min: 180
+          max: 600
           step: 1
           unit_of_measurement: s
           mode: box
@@ -159,8 +159,7 @@ blueprint:
         entity:
           domain: button
 
-mode: queued
-max: 20
+mode: single
 
 trigger_variables:
   clean_switch_trigger_1: !input clean_switch_1_input
@@ -218,6 +217,9 @@ trigger:
     for:
       seconds: !input ready_delay_seconds
 
+  - platform: time_pattern
+    minutes: "/30"
+
 condition:
   - condition: state
     entity_id: !input roborock_cleaning_binary_sensor
@@ -225,6 +227,13 @@ condition:
 
 action:
   - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input roborock_cleaning_binary_sensor
+            state: "on"
+        sequence:
+          - stop: "Robot is busy"
+
       - conditions:
           - condition: template
             value_template: "{{ is_state(clean_switch_1, 'on') }}"
