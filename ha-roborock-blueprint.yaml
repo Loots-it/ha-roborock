@@ -81,11 +81,12 @@ blueprint:
       default: []
       selector:
         object:
-    map_apply_delay_seconds:
-      name: Map apply delay (seconds)
+    map_delay_seconds:
+      name: Map settle delay (seconds)
       description: >
-        Wait time between writing the alternate map and pressing the clean button. `save_map`
-        is asynchronous - too short and the robot still starts with the old zones.
+        How long to wait after every `save_map` write - both before pressing the clean button
+        and after restoring the normal set. The command is asynchronous; too short and the
+        robot still runs on the previous zones.
       default: 5
       selector:
         number:
@@ -94,19 +95,20 @@ blueprint:
           step: 1
           unit_of_measurement: s
           mode: box
-    map_restore_delay_seconds:
-      name: Map restore delay (seconds)
+    alternate_map_state_input:
+      name: Alternate-map state helper (optional)
       description: >
-        Wait time after the robot has started cleaning, before the normal map is written back.
-        The robot reads its zones when a task starts, so restoring during the run is safe.
-      default: 5
+        input_boolean that remembers the alternate zones are currently loaded. Required for the
+        alternate-map feature.
+
+        Writing the map while the robot is cleaning makes it PAUSE, so the normal set can never
+        be restored during a run. Instead this helper is switched on before the alternate set is
+        written, and the next run - once the robot is idle again - restores the normal set and
+        switches the helper off before starting the next room.
+      default:
       selector:
-        number:
-          min: 0
-          max: 120
-          step: 1
-          unit_of_measurement: s
-          mode: box
+        entity:
+          domain: input_boolean
 
     clean_switch_1_input:
       name: Clean switch 1
@@ -293,6 +295,7 @@ variables:
 
   vacuum_entity: !input roborock_vacuum_entity
   alt_map_switch: !input alternate_map_switch_input
+  alt_map_state: !input alternate_map_state_input
   zones_normal: !input map_zones_normal
   zones_alternate: !input map_zones_alternate
 
@@ -322,12 +325,13 @@ variables:
     {% endfor %}
     {{ ns.out }}
 
-  # The feature only arms itself with a vacuum, a chosen routine and a non-empty normal set,
-  # so a half-filled configuration can never wipe the map.
+  # The feature only arms itself with a vacuum, a chosen routine, a state helper and a
+  # non-empty normal set, so a half-filled configuration can never wipe the map.
   map_enabled: >
     {{ vacuum_entity not in [none, ''] and alt_map_switch not in [none, '']
-       and payload_normal | count > 0 }}
+       and alt_map_state not in [none, ''] and payload_normal | count > 0 }}
   use_alternate_map: "{{ map_enabled and pending_switch == alt_map_switch }}"
+  restore_pending: "{{ map_enabled and is_state(alt_map_state, 'on') }}"
 
 triggers:
   - trigger: template
@@ -377,15 +381,41 @@ condition:
       seconds: !input ready_delay_seconds
 
 action:
+  # ---------------------------------------------------------------------------
+  # The alternate zones are still loaded from a previous run and the robot is idle
+  # again (the conditions above guarantee that), so put the normal set back first.
+  # Skipped when the pending task wants the alternate set anyway - that would only
+  # write the map twice for nothing.
+  # ---------------------------------------------------------------------------
+  - if:
+      - condition: template
+        value_template: "{{ restore_pending and not use_alternate_map }}"
+    then:
+      - service: vacuum.send_command
+        target:
+          entity_id: "{{ vacuum_entity }}"
+        data:
+          command: save_map
+          params: "{{ payload_normal }}"
+      - delay:
+          seconds: !input map_delay_seconds
+      - service: input_boolean.turn_off
+        target:
+          entity_id: "{{ alt_map_state }}"
+
   # Nothing switched on -> nothing to do.
   - condition: template
     value_template: "{{ pending_index >= 0 }}"
 
-  # Only for the one routine that needs it: load the alternate zones first.
+  # Only for the one routine that needs it: load the alternate zones first. The helper goes on
+  # before the write, so an interrupted run can never leave the alternate set behind unnoticed.
   - if:
       - condition: template
         value_template: "{{ use_alternate_map }}"
     then:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: "{{ alt_map_state }}"
       - service: vacuum.send_command
         target:
           entity_id: "{{ vacuum_entity }}"
@@ -393,7 +423,7 @@ action:
           command: save_map
           params: "{{ payload_alternate }}"
       - delay:
-          seconds: !input map_apply_delay_seconds
+          seconds: !input map_delay_seconds
 
   - service: button.press
     target:
@@ -416,19 +446,3 @@ action:
       - service: input_boolean.turn_off
         target:
           entity_id: "{{ pending_switch }}"
-
-  # Put the normal zones back. The robot read its zones when the task started, so this does
-  # not affect the run in progress. Runs even if the robot never started, so the alternate
-  # set can never stay behind.
-  - if:
-      - condition: template
-        value_template: "{{ use_alternate_map }}"
-    then:
-      - delay:
-          seconds: !input map_restore_delay_seconds
-      - service: vacuum.send_command
-        target:
-          entity_id: "{{ vacuum_entity }}"
-        data:
-          command: save_map
-          params: "{{ payload_normal }}"
