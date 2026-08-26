@@ -35,6 +35,78 @@ blueprint:
           step: 1
           unit_of_measurement: s
           mode: box
+    roborock_vacuum_entity:
+      name: Roborock vacuum entity (optional)
+      description: >
+        Only needed for the alternate-map feature below. The `save_map` command is sent here.
+      default:
+      selector:
+        entity:
+          domain: vacuum
+    alternate_map_switch_input:
+      name: Routine that uses the alternate map (optional)
+      description: >
+        Pick the same clean switch as the routine that needs the alternate map. Only that one
+        routine gets the alternate zones; every other routine runs on the normal set.
+        Leave empty to disable the whole feature.
+      default:
+      selector:
+        entity:
+          domain: input_boolean
+    map_zones_normal:
+      name: Map zones - normal set
+      description: >
+        The COMPLETE set of no-go zones that should normally be active. `save_map` overwrites
+        everything, so anything missing from this list gets deleted.
+
+        Enter only the two corner points of each rectangle:
+          [[x1, y1, x2, y2], [x1, y1, x2, y2], ...]
+
+        Raw Roborock coordinates (map centre is ~25500) - the values the Xiaomi Vacuum Map Card
+        gives you via Copy in "Setup integer" mode. Drop the 5th number the card adds (that is
+        the repeat count for zone cleaning, not part of the map).
+
+        Optional 5th element to change the type: 0 = no-go zone (default), 1 = invisible wall
+        (a line from x1,y1 to x2,y2), 2 = no-mop zone.
+
+        Max 68 points in total (a zone = 4 points, a wall = 2).
+      default: []
+      selector:
+        object:
+    map_zones_alternate:
+      name: Map zones - alternate set
+      description: >
+        Same list as above, minus the zone that is in the way for that one routine.
+        Same format. An empty list ([]) clears all zones for that routine.
+      default: []
+      selector:
+        object:
+    map_apply_delay_seconds:
+      name: Map apply delay (seconds)
+      description: >
+        Wait time between writing the alternate map and pressing the clean button. `save_map`
+        is asynchronous - too short and the robot still starts with the old zones.
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 120
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    map_restore_delay_seconds:
+      name: Map restore delay (seconds)
+      description: >
+        Wait time after the robot has started cleaning, before the normal map is written back.
+        The robot reads its zones when a task starts, so restoring during the run is safe.
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 120
+          step: 1
+          unit_of_measurement: s
+          mode: box
 
     clean_switch_1_input:
       name: Clean switch 1
@@ -200,6 +272,63 @@ variables:
   clean_switch_10: !input clean_switch_10_input
   clean_btn_10: !input clean_btn_10_input
 
+  task_switches: >
+    {{ [clean_switch_1, clean_switch_2, clean_switch_3, clean_switch_4, clean_switch_5,
+        clean_switch_6, clean_switch_7, clean_switch_8, clean_switch_9, clean_switch_10] }}
+  task_buttons: >
+    {{ [clean_btn_1, clean_btn_2, clean_btn_3, clean_btn_4, clean_btn_5,
+        clean_btn_6, clean_btn_7, clean_btn_8, clean_btn_9, clean_btn_10] }}
+
+  # Index of the task to run: the first switch that is on and has a button. -1 = nothing to do.
+  pending_index: >
+    {% set ns = namespace(i=-1) %}
+    {% for n in range(10) %}
+      {% if ns.i < 0 and task_switches[n] and task_buttons[n] and is_state(task_switches[n], 'on') %}
+        {% set ns.i = n %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.i }}
+  pending_switch: "{{ task_switches[pending_index] if pending_index >= 0 else none }}"
+  pending_button: "{{ task_buttons[pending_index] if pending_index >= 0 else none }}"
+
+  vacuum_entity: !input roborock_vacuum_entity
+  alt_map_switch: !input alternate_map_switch_input
+  zones_normal: !input map_zones_normal
+  zones_alternate: !input map_zones_alternate
+
+  # Expand [x1, y1, x2, y2] rectangles into what save_map wants:
+  #   type 1 (wall) -> [1, x1, y1, x2, y2]
+  #   type 0 / 2    -> [t, x1, y1, x2, y1, x2, y2, x1, y2]  (four corners, clockwise)
+  payload_normal: >
+    {% set ns = namespace(out=[]) %}
+    {% for z in (zones_normal or []) %}
+      {% set t = z[4] if z | count > 4 else 0 %}
+      {% if t == 1 %}
+        {% set ns.out = ns.out + [[1, z[0], z[1], z[2], z[3]]] %}
+      {% else %}
+        {% set ns.out = ns.out + [[t, z[0], z[1], z[2], z[1], z[2], z[3], z[0], z[3]]] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.out }}
+  payload_alternate: >
+    {% set ns = namespace(out=[]) %}
+    {% for z in (zones_alternate or []) %}
+      {% set t = z[4] if z | count > 4 else 0 %}
+      {% if t == 1 %}
+        {% set ns.out = ns.out + [[1, z[0], z[1], z[2], z[3]]] %}
+      {% else %}
+        {% set ns.out = ns.out + [[t, z[0], z[1], z[2], z[1], z[2], z[3], z[0], z[3]]] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.out }}
+
+  # The feature only arms itself with a vacuum, a chosen routine and a non-empty normal set,
+  # so a half-filled configuration can never wipe the map.
+  map_enabled: >
+    {{ vacuum_entity not in [none, ''] and alt_map_switch not in [none, '']
+       and payload_normal | count > 0 }}
+  use_alternate_map: "{{ map_enabled and pending_switch == alt_map_switch }}"
+
 triggers:
   - trigger: template
     value_template: >
@@ -248,183 +377,58 @@ condition:
       seconds: !input ready_delay_seconds
 
 action:
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ is_state(clean_switch_1, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_1 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_1 }}"
+  # Nothing switched on -> nothing to do.
+  - condition: template
+    value_template: "{{ pending_index >= 0 }}"
 
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_2 and clean_btn_2 and is_state(clean_switch_2, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_2 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_2 }}"
+  # Only for the one routine that needs it: load the alternate zones first.
+  - if:
+      - condition: template
+        value_template: "{{ use_alternate_map }}"
+    then:
+      - service: vacuum.send_command
+        target:
+          entity_id: "{{ vacuum_entity }}"
+        data:
+          command: save_map
+          params: "{{ payload_alternate }}"
+      - delay:
+          seconds: !input map_apply_delay_seconds
 
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_3 and clean_btn_3 and is_state(clean_switch_3, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_3 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_3 }}"
+  - service: button.press
+    target:
+      entity_id: "{{ pending_button }}"
 
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_4 and clean_btn_4 and is_state(clean_switch_4, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_4 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_4 }}"
+  # Wait until the robot has actually picked the job up.
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input roborock_cleaning_binary_sensor
+        to: "on"
+        for: "00:00:05"
+    timeout: "00:02:05"
+    continue_on_timeout: true
 
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_5 and clean_btn_5 and is_state(clean_switch_5, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_5 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_5 }}"
+  # Only clear the switch if it really started - otherwise the next run retries.
+  - if:
+      - condition: template
+        value_template: "{{ wait.trigger is not none }}"
+    then:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: "{{ pending_switch }}"
 
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_6 and clean_btn_6 and is_state(clean_switch_6, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_6 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_6 }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_7 and clean_btn_7 and is_state(clean_switch_7, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_7 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_7 }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_8 and clean_btn_8 and is_state(clean_switch_8, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_8 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_8 }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_9 and clean_btn_9 and is_state(clean_switch_9, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_9 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_9 }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ clean_switch_10 and clean_btn_10 and is_state(clean_switch_10, 'on') }}"
-        sequence:
-          - service: button.press
-            target:
-              entity_id: "{{ clean_btn_10 }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input roborock_cleaning_binary_sensor
-                to: "on"
-                for: "00:00:05"
-            timeout: "00:02:05"
-            continue_on_timeout: false
-          - service: input_boolean.turn_off
-            target:
-              entity_id: "{{ clean_switch_10 }}"
+  # Put the normal zones back. The robot read its zones when the task started, so this does
+  # not affect the run in progress. Runs even if the robot never started, so the alternate
+  # set can never stay behind.
+  - if:
+      - condition: template
+        value_template: "{{ use_alternate_map }}"
+    then:
+      - delay:
+          seconds: !input map_restore_delay_seconds
+      - service: vacuum.send_command
+        target:
+          entity_id: "{{ vacuum_entity }}"
+        data:
+          command: save_map
+          params: "{{ payload_normal }}"
